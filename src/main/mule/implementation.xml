@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	
+	<flow name="get-orderItem-by-quieryparam-flow" doc:id="07a6945e-4d0f-40b3-bcdf-acdaed838b9f" >
+		<set-variable value="#[attributes.headers]" doc:name="headers" doc:id="fbbdd184-a2d3-4570-b6c5-2e8ce69323a0" variableName="headers"/>
+		<set-variable value="#[attributes.queryParam.'order-id']" doc:name="orderId" doc:id="21064a5a-5e22-45c1-87f7-a80fd0625798" variableName="orderId"/>
+		<logger level="INFO" doc:name="Logger" doc:id="ae413ebb-a550-4ea9-8f1a-8a3985a868c3" message="#[output application/json
+--- 
+{
+	correlationId: vars.headers.'X-correlation-id',
+	sessionId: vars.headers.'X-session-id',
+	applicationName: app.name,
+	message: &quot;request received for getting item details based on Item Id&quot;
+}]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="94b2b5ba-856e-4086-918b-981a3bb2735d" message="#[output application/json
+---
+{
+	correlationId: vars.headers.'X-correlation-id',
+	sessionId: vars.headers.'X-session-id',
+	applicationName: app.name,
+	message: &quot;Requesting database to get item details&quot;
+}]" />
+		<db:select doc:name="Select" doc:id="82d2f68c-0504-4990-9c3d-62a9fe7c149a" config-ref="Database_Config">
+			<db:sql >SELECT orderItemId,orderID, itemId, itemCount FROM orderItems where orderID = :orderId</db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	orderId: attributes.queryParams.'order-id'
+}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="2664581f-7dd8-4450-9f85-c74757a6977d" >
+			<when expression="#[sizeOf(payload) != 0]">
+				<ee:transform doc:name="Transform Message" doc:id="38795426-9701-4900-962a-561155867073">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map (orderItem, index) ->
+{
+	orderItemId: orderItem.orderItemId as Number,
+	orderId: orderItem.orderId as Number,
+	itemId: orderItem.itemId as Number,
+	itemCount: orderItem.itemCount as Number
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="ff72ffe9-c512-4951-8863-6b386f14e8c1" message="#[output application/json
+---
+{
+	correlationId: vars.headers.'X-correlation-id',
+	sessionId: vars.headers.'X-session-id',
+	applicationName: app.name,
+	message: &quot;Details fetched from Database&quot;
+}]" />
+			
+</when>
+			<otherwise >
+				<raise-error doc:name="Raise error" doc:id="7a3e93d9-a3b8-4f9c-84c3-271baf0ec37d" type="ORDERITEM:NOT_FOUND" description="There is no order items corresponding to the order Number"/>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>
